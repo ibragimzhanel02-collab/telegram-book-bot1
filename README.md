@@ -96,8 +96,8 @@ python bookbot/bot.py
 ## Скриншоты
 
 ### Telegram интерфейс
-![img_1.png](img_1.png)
+![img_2.png](img_2.png)
 
 ### Django Admin
 
-![img.png](img.png)
+![img 1.png](img_1.png)

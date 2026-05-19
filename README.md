@@ -1,4 +1,4 @@
-# 📚 Telegram Book Bot
+# Telegram Book Bot
 
 ## Описание проекта
 
@@ -15,7 +15,6 @@ Telegram-бот для рекомендаций книг, разработанн
 
 Также проект содержит Django-admin для управления пользователями и сообщениями.
 
----
 
 ## Используемые технологии
 
@@ -33,7 +32,7 @@ Telegram-бот для рекомендаций книг, разработанн
 Клонировать проект:
 
 ```bash
-git clone https://github.com/ibragim.zhamel02/telegram-book-bot1.git
+git clone https://github.com/ibragimzhanel02-collab/telegram-book-bot1/tree/main
 ```
 
 Перейти в папку:
@@ -82,19 +81,13 @@ python bookbot/bot.py
 
 ## Возможности
 
-📚 Жанры книг
-
-👨‍💻 Авторы
-
-🎲 Рандомные книги
-
-⭐ Избранное
-
-📢 Массовая рассылка
-
-⏰ Напоминания
-
-💳 Premium раздел
+- Жанры книг
+- Авторы
+- Рандомные книги
+- Избранное
+- Массовая рассылка
+- Напоминания
+- Premium раздел
 
 📩 Ответ пользователям через Django Admin
 
@@ -103,8 +96,7 @@ python bookbot/bot.py
 ## Скриншоты
 
 ### Telegram интерфейс
-
-(вставить скрин главного меню)
+![img_1.png](img_1.png)
 
 ### Django Admin
 

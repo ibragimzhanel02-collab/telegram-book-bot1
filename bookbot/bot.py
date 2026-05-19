@@ -2,19 +2,42 @@ import telebot
 import os
 import django
 import random
+import time
+import schedule
+import threading
+
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'bookbot.settings')
 django.setup()
 
-from books.models import Genre, Book, Author, Favorite
+from books.models import Genre, Book, Author, Favorite, User, UserQuery, UserMessage, Broadcast
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 TOKEN = "8717776406:AAEbNW9ABxlsDvJdqPDzimU14EZPX6qhOAU"
 
 bot = telebot.TeleBot(TOKEN)
 
+def edit_or_send(call, text, markup=None):
 
-# ===== ГЛАВНОЕ МЕНЮ =====
+    try:
+
+        bot.edit_message_text(
+            text,
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            reply_markup=markup
+        )
+
+    except:
+
+        bot.send_message(
+            call.message.chat.id,
+            text,
+            reply_markup=markup
+        )
+
+
+# ГЛАВНОЕ МЕНЮ
 
 def main_menu():
     markup = InlineKeyboardMarkup()
@@ -26,11 +49,17 @@ def main_menu():
     markup.add(
         InlineKeyboardButton("⭐ Избранное", callback_data="favorites")
     )
+    markup.add(
+        InlineKeyboardButton(
+            "💳 Premium",
+            callback_data="premium"
+        )
+    )
 
     return markup
 
 
-# ===== ОТПРАВКА КНИГИ =====
+# ОТПРАВКА КНИГИ
 
 def send_book(chat_id, book):
 
@@ -54,12 +83,6 @@ def send_book(chat_id, book):
         )
     )
 
-    markup.add(
-        InlineKeyboardButton(
-            "⬅️ Назад",
-            callback_data="genres"
-        )
-    )
 
     bot.send_message(
         chat_id,
@@ -68,31 +91,97 @@ def send_book(chat_id, book):
     )
 
 
-# ===== START =====
+#START
 
 @bot.message_handler(commands=['start'])
 def start(message):
 
+    UserQuery.objects.create(
+        user_id=message.from_user.id,
+        username=message.from_user.username,
+        message="/start"
+    )
+
+    user_exists = User.objects.filter(
+        telegram_id=message.from_user.id
+    ).first()
+
+    if not user_exists:
+
+        User.objects.create(
+            telegram_id=message.from_user.id,
+            username=message.from_user.username,
+            first_name=message.from_user.first_name
+        )
+
     bot.send_message(
         message.chat.id,
-        "📚 Добро пожаловать в бот рекомендаций книг!",
+        """
+        Добро пожаловать в Book Bot!
+        Я помогу подобрать книги по жанрам и авторам
+
+        Что умеет бот:
+
+        📚 Рекомендации книг
+        👨‍💻 Поиск по авторам
+        🎲 Случайные книги
+        ⭐ Избранное
+        💳 Premium
+
+        Выберите действие ниже 👇
+        """
+        ,
         reply_markup=main_menu()
     )
 
+@bot.message_handler(commands=['help'])
+def help_command(message):
 
-# ===== ГЛАВНОЕ МЕНЮ =====
+    text = """
+📚 Book Bot Help
+
+Доступные команды:
+
+/start — запуск бота
+
+/help — помощь
+
+Функции бота:
+
+📚 Выбор книг по жанрам
+
+👨‍💻 Поиск по авторам
+
+🎲 Случайная книга
+
+⭐ Избранное
+
+📢 Рассылки
+
+⏰ Напоминания
+
+💳 Premium раздел
+"""
+
+    bot.send_message(
+        message.chat.id,
+        text
+    )
+
+
+# ГЛАВНОЕ МЕНЮ
 
 @bot.callback_query_handler(func=lambda call: call.data == "home")
 def home(call):
 
-    bot.send_message(
-        call.message.chat.id,
+    edit_or_send(
+        call,
         "🏠 Главное меню",
-        reply_markup=main_menu()
+        main_menu()
     )
 
 
-# ===== ЖАНРЫ =====
+#ЖАНРЫ
 
 @bot.callback_query_handler(func=lambda call: call.data == "genres")
 def genres(call):
@@ -115,14 +204,13 @@ def genres(call):
         )
     )
 
-    bot.send_message(
-        call.message.chat.id,
+    edit_or_send(
+        call,
         "📚 Выберите жанр:",
-        reply_markup=markup
+        markup
     )
 
-
-# ===== МЕНЮ ЖАНРА =====
+#МЕНЮ ЖАНРА
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("genre_"))
 def genre_menu(call):
@@ -152,14 +240,14 @@ def genre_menu(call):
         )
     )
 
-    bot.send_message(
-        call.message.chat.id,
+    edit_or_send(
+        call,
         "📖 Что хотите посмотреть?",
-        reply_markup=markup
+        markup
     )
 
 
-# ===== РАНДОМНАЯ КНИГА =====
+# РАНДОМНАЯ КНИГА
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("random_"))
 def random_book(call):
@@ -180,7 +268,7 @@ def random_book(call):
         )
 
 
-# ===== АВТОРЫ =====
+# АВТОРЫ
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("authors_"))
 def authors(call):
@@ -205,14 +293,14 @@ def authors(call):
         )
     )
 
-    bot.send_message(
-        call.message.chat.id,
+    edit_or_send(
+        call,
         "👨‍💻 Выберите автора:",
-        reply_markup=markup
+        markup
     )
 
 
-# ===== КНИГИ АВТОРА =====
+# КНИГИ АВТОРА
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("author_"))
 def books_by_author(call):
@@ -239,14 +327,14 @@ def books_by_author(call):
         )
     )
 
-    bot.send_message(
-        call.message.chat.id,
+    edit_or_send(
+        call,
         "📚 Книги автора:",
-        reply_markup=markup
+        markup
     )
 
 
-# ===== ИНФОРМАЦИЯ О КНИГЕ =====
+# ИНФОРМАЦИЯ О КНИГЕ
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("book_"))
 def book_info(call):
@@ -261,7 +349,7 @@ def book_info(call):
     )
 
 
-# ===== ДОБАВИТЬ В ИЗБРАННОЕ =====
+# ДОБАВИТЬ В ИЗБРАННОЕ
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("fav_"))
 def add_fav(call):
@@ -293,7 +381,7 @@ def add_fav(call):
     )
 
 
-# ===== ИЗБРАННОЕ =====
+# ИЗБРАННОЕ
 
 @bot.callback_query_handler(func=lambda call: call.data == "favorites")
 def favorites(call):
@@ -319,8 +407,240 @@ def favorites(call):
         )
 
 
-# ===== ЗАПУСК =====
+
+def check_broadcasts():
+
+    broadcasts = Broadcast.objects.filter(sent=False)
+
+    users = UserMessage.objects.values_list(
+        'user_id',
+        flat=True
+    ).distinct()
+
+    for broadcast in broadcasts:
+
+        for user_id in users:
+
+            try:
+                bot.send_message(
+                    user_id,
+                    f"📢 {broadcast.text}"
+                )
+            except Exception as e:
+                print(e)
+
+
+        broadcast.sent = True
+        broadcast.save()
+
+
+@bot.callback_query_handler(func=lambda call: call.data == "premium")
+def premium(call):
+
+    text = """
+💎 PREMIUM ПОДПИСКА
+
+✅ Безлимитные рекомендации
+✅ Эксклюзивные книги
+✅ Личный список чтения
+
+💳 Оплата временно недоступна
+"""
+
+    bot.send_message(
+        call.message.chat.id,
+        text
+    )
+def reminder_message():
+
+    users = UserMessage.objects.values_list(
+        'user_id',
+        flat=True
+    ).distinct()
+
+    for user in users:
+
+        try:
+            bot.send_message(
+                user,
+                "📚 Не забудьте почитать сегодня!"
+            )
+        except:
+            pass
+
+
+schedule.every().day.at("18:50").do(reminder_message)
+
+# ЗАПУСК
 
 print("Бот запущен...")
 
-bot.infinity_polling()
+
+@bot.message_handler(func=lambda message: True)
+def chat_dialog(message):
+
+    if not message.text:
+
+        bot.send_message(
+            message.chat.id,
+            "❌ Пустое сообщение"
+        )
+
+        return
+
+    text = message.text.lower()
+
+    # сохранение сообщений
+
+    UserMessage.objects.create(
+        user_id=message.from_user.id,
+        username=message.from_user.username,
+        message=message.text
+    )
+
+    # приветствие
+
+    if text in ["привет", "hello", "hi"]:
+
+        bot.send_message(
+            message.chat.id,
+            "👋 Привет! Я бот рекомендаций книг 📚"
+        )
+
+    # помощь
+
+    elif text in ["помощь", "help"]:
+
+        bot.send_message(
+            message.chat.id,
+            "❓ Используй /help"
+        )
+
+    # рекомендации
+
+    elif "книга" in text:
+
+        bot.send_message(
+            message.chat.id,
+            "📚 Используйте кнопку Жанры для выбора книг"
+        )
+
+    # авторы
+
+    elif "автор" in text:
+
+        bot.send_message(
+            message.chat.id,
+            "👨‍💻 Выберите жанр → автор → книгу"
+        )
+
+    # избранное
+
+    elif "избранное" in text:
+
+        bot.send_message(
+            message.chat.id,
+            "⭐ Откройте раздел Избранное"
+        )
+
+    # рейтинг
+
+    elif "рейтинг" in text:
+
+        bot.send_message(
+            message.chat.id,
+            "⭐ У каждой книги есть рейтинг"
+        )
+
+    # жанры
+
+    elif "жанр" in text:
+
+        bot.send_message(
+            message.chat.id,
+            "📚 Доступно более 10 жанров"
+        )
+
+    # premium
+
+    elif "premium" in text:
+
+        bot.send_message(
+            message.chat.id,
+            "💳 Premium раздел доступен в меню"
+        )
+
+    # погода
+
+    elif text.startswith("/weather"):
+
+        bot.send_message(
+            message.chat.id,
+            "🌤 Функция погоды пока в разработке"
+        )
+
+    # неизвестная команда
+
+    else:
+
+        bot.send_message(
+            message.chat.id,
+            "❌ Неизвестная команда\nИспользуйте /help"
+        )
+
+
+def check_admin_replies():
+
+    messages = UserMessage.objects.filter(
+        replied=False
+    ).exclude(
+        admin_reply__isnull=True
+    ).exclude(
+        admin_reply=""
+    )
+
+    for msg in messages:
+
+        try:
+
+            bot.send_message(
+                msg.user_id,
+                f"📩 Ответ поддержки:\n\n{msg.admin_reply}"
+            )
+
+            msg.replied = True
+
+            msg.save()
+
+        except:
+            pass
+
+
+def background_tasks():
+
+    while True:
+
+        schedule.run_pending()
+
+        check_broadcasts()
+
+        check_admin_replies()
+
+        time.sleep(3)
+
+
+threading.Thread(
+    target=background_tasks,
+    daemon=True
+).start()
+
+
+bot.infinity_polling(
+    timeout=10,
+    long_polling_timeout=5
+)
+
+
+# python bookbot/bot.py
+#python bookbot/manage.py runserver
+#http://127.0.0.1:8000/admin
